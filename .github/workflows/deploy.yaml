@@ -118,7 +118,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform -chdir=./terraform init
+        run: terraform -chdir=./infra init
 
       - name: Terraform Destroy
-        run: terraform -chdir=./terraform destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
+        run: terraform -chdir=./infra destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
