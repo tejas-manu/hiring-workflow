@@ -89,6 +89,11 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_permissions.arn
 }
 
+resource "aws_iam_role_policy_attachment" "s3_read_only_attachment" {
+  role       = aws_iam_role.lambda_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+}
+
 
 resource "aws_s3_bucket" "resume_bucket" {
   bucket = "${var.project_name}-bucket-${random_id.bucket_suffix.hex}"
