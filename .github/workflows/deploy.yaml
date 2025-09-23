@@ -1,0 +1,67 @@
+name: Deploy Lambda to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Docker Image
+        run: docker build --platform linux/amd64 -t lambda-packaging .
+
+      - name: Run Docker Container and Copy Files
+        run: |
+          docker run --name lambda-temp -d lambda-packaging
+          docker cp lambda-temp:/var/task/. ./
+          docker rm -f lambda-temp
+
+      - name: Zip Deployment Package
+        run: zip -r deployment_package.zip ./*
+
+      - name: Get S3 Bucket Name
+        id: terraform_outputs
+        run: |
+          # Use Terraform to get the bucket name from a remote state (if it exists)
+          # or assume a known name if this is the first run.
+          # For simplicity, we'll hardcode the name based on the terraform file
+          # and assume the bucket will be created on the first apply.
+          # In a production environment, you would use 'terraform output' with a remote backend.
+          echo "s3_bucket_name=$(terraform output --raw s3_bucket_name)" >> $GITHUB_OUTPUT
+
+      - name: Upload Lambda package to S3
+        run: aws s3 cp deployment_package.zip s3://${{ steps.terraform_outputs.outputs.s3_bucket_name }}/deployment_package.zip
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
