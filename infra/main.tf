@@ -100,6 +100,7 @@ resource "aws_s3_bucket" "resume_bucket" {
   force_destroy = true
 }
 
+
 # Add a random suffix to the bucket name to ensure it's globally unique.
 resource "random_id" "bucket_suffix" {
   byte_length = 8
