@@ -1,9 +1,5 @@
 terraform {
 
-}
-
-terraform {
-
   backend "s3" {
     bucket = "my-terraform-state-bucket-personal"
     key    = "resume-workflow/terraform.tfstate"
