@@ -97,6 +97,7 @@ resource "aws_iam_role_policy_attachment" "s3_read_only_attachment" {
 
 resource "aws_s3_bucket" "resume_bucket" {
   bucket = "${var.project_name}-bucket-${random_id.bucket_suffix.hex}"
+  force_destroy = true
 }
 
 # Add a random suffix to the bucket name to ensure it's globally unique.
