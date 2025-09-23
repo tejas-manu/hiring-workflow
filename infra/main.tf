@@ -5,8 +5,8 @@ terraform {
 terraform {
 
   backend "s3" {
-    bucket = "my-terraform-state-bucket"
-    key    = "path/to/my/terraform.tfstate"
+    bucket = "my-terraform-state-bucket-personal"
+    key    = "resume-workflow/terraform.tfstate"
     region = "us-east-1"
         
   }
@@ -114,7 +114,7 @@ resource "aws_lambda_function" "resume_processor_lambda" {
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.13"
-  timeout          = 30
+  timeout          = 180
   memory_size      = 256
 
   # Use the dummy package for the initial creation.
