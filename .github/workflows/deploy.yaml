@@ -43,7 +43,7 @@ jobs:
       - name: Get Terraform Outputs
         id: get_outputs
         run: |
-          cd ./terraform
+          cd ./infra
           echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
           echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
         
