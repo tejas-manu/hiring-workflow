@@ -1,131 +1,153 @@
-# Define the AWS provider and specify a region
+terraform {
+
+}
+
+terraform {
+
+  backend "s3" {
+    bucket = "my-terraform-state-bucket"
+    key    = "path/to/my/terraform.tfstate"
+    region = "us-east-1"
+        
+  }
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.2"
+    }
+  }
+}
+
 provider "aws" {
-  region = "us-east-1" 
+  region = var.aws_region
 }
 
-# Generate a unique bucket name to avoid naming conflicts
-resource "random_string" "bucket_suffix" {
-  length  = 6
-  special = false
-  upper   = false
+# Create a dummy zip file for the initial Lambda deployment.
+# The actual code will be uploaded by the GitHub Actions workflow.
+data "archive_file" "dummy_lambda_package" {
+  type        = "zip"
+  output_path = "${path.module}/dummy_package.zip"
+  source {
+    content  = "exports.handler = (event, context, callback) => callback(null, 'hello world');"
+    filename = "index.js"
+  }
 }
 
-# Create an S3 bucket to store the Lambda deployment package
-resource "aws_s3_bucket" "lambda_bucket" {
-  bucket = "resume-processor-lambda-code-${random_string.bucket_suffix.result}"
-}
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "${var.project_name}-lambda-execution-role"
 
-# Create a role for the Lambda function
-resource "aws_iam_role" "lambda_role" {
-  name = "lambda-resume-processor-role"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
         Principal = {
           Service = "lambda.amazonaws.com"
         }
-      },
-    ]
-  })
-}
-
-# Attach a policy to the role allowing Lambda to write to CloudWatch logs,
-# read from S3, and publish to SNS
-resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda-resume-processor-policy"
-  role = aws_iam_role.lambda_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "arn:aws:logs:*:*:*"
-      },
-      {
-        Effect = "Allow"
-        Action = "s3:GetObject"
-        Resource = "${aws_s3_bucket.lambda_bucket.arn}/*"
-      },
-      {
-        Effect = "Allow"
-        Action = "sns:Publish"
-        Resource = aws_sns_topic.resume_topic.arn
       }
     ]
   })
 }
 
-# Create an SNS topic for notifications
-resource "aws_sns_topic" "resume_topic" {
-  name = "ResumeProcessorTopic"
+resource "aws_iam_policy" "lambda_permissions" {
+  name        = "${var.project_name}-lambda-policy"
+  description = "Permissions for the resume processor Lambda function"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Effect   = "Allow",
+        Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Action   = "s3:GetObject",
+        Effect   = "Allow",
+        Resource = "${aws_s3_bucket.resume_bucket.arn}/*"
+      },
+      {
+        Action   = "sns:Publish",
+        Effect   = "Allow",
+        Resource = aws_sns_topic.notifications.arn
+      }
+    ]
+  })
 }
 
-# Create the Lambda function
-resource "aws_lambda_function" "resume_processor" {
-  function_name = "ResumeProcessor"
-  s3_bucket     = aws_s3_bucket.lambda_bucket.id
-  s3_key        = "deployment_package.zip"
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.13"
-  role          = aws_iam_role.lambda_role.arn
-  timeout       = 30
+resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
+  role       = aws_iam_role.lambda_execution_role.name
+  policy_arn = aws_iam_policy.lambda_permissions.arn
+}
+
+
+resource "aws_s3_bucket" "resume_bucket" {
+  bucket = "${var.project_name}-bucket-${random_id.bucket_suffix.hex}"
+}
+
+# Add a random suffix to the bucket name to ensure it's globally unique.
+resource "random_id" "bucket_suffix" {
+  byte_length = 8
+}
+
+resource "aws_sns_topic" "notifications" {
+  name = "${var.project_name}-notifications"
+}
+
+resource "aws_sns_topic_subscription" "email_subscription" {
+  topic_arn = aws_sns_topic.notifications.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+resource "aws_lambda_function" "resume_processor_lambda" {
+  function_name    = "${var.project_name}-function"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.13"
+  timeout          = 30
+  memory_size      = 256
+
+  # Use the dummy package for the initial creation.
+  filename         = data.archive_file.dummy_lambda_package.output_path
+  source_code_hash = data.archive_file.dummy_lambda_package.output_base64sha256
 
   environment {
     variables = {
-      GEMINI_API_KEY  = var.gemini_api_key
-      SNS_TOPIC_ARN   = aws_sns_topic.resume_topic.arn
+      # These will be populated from GitHub Actions secrets
+      GEMINI_API_KEY = "dummy_value"
+      SNS_TOPIC_ARN  = aws_sns_topic.notifications.arn
     }
   }
 }
 
-# Give S3 permission to invoke the Lambda function
+# Permission for S3 to invoke the Lambda function
 resource "aws_lambda_permission" "allow_s3" {
-  statement_id  = "AllowExecutionFromS3Bucket"
+  statement_id  = "AllowS3Invoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.resume_processor.function_name
+  function_name = aws_lambda_function.resume_processor_lambda.function_name
   principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.lambda_bucket.arn
+  source_arn    = aws_s3_bucket.resume_bucket.arn
 }
 
-# Configure the S3 bucket to trigger the Lambda function on new object creation
-resource "aws_s3_bucket_notification" "s3_to_lambda" {
-  bucket = aws_s3_bucket.lambda_bucket.id
+# Configure the S3 bucket to trigger the Lambda on file upload
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = aws_s3_bucket.resume_bucket.id
+
   lambda_function {
-    lambda_function_arn = aws_lambda_function.resume_processor.arn
+    lambda_function_arn = aws_lambda_function.resume_processor_lambda.arn
     events              = ["s3:ObjectCreated:*"]
   }
+
   depends_on = [aws_lambda_permission.allow_s3]
-}
-
-# Define variables that will be passed into Terraform from GitHub Actions
-variable "gemini_api_key" {
-  description = "The Gemini API key to use for the Lambda function."
-  type        = string
-  sensitive   = true
-}
-
-# The SNS Topic ARN is created by Terraform so no need for a variable
-# variable "sns_topic_arn" {
-#   description = "The ARN of the SNS topic for notifications."
-#   type        = string
-# }
-
-# Output the S3 bucket name and SNS topic ARN
-output "s3_bucket_name" {
-  description = "The name of the S3 bucket where Lambda code is uploaded."
-  value       = aws_s3_bucket.lambda_bucket.id
-}
-
-output "sns_topic_arn" {
-  description = "The ARN of the created SNS topic."
-  value       = aws_sns_topic.resume_topic.arn
 }
 
