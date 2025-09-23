@@ -14,6 +14,8 @@ jobs:
     name: Provision Infrastructure with Terraform
     runs-on: ubuntu-latest
 
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,6 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: provision_infra # This job runs only after the infra is provisioned
 
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -92,3 +96,29 @@ jobs:
           aws lambda update-function-configuration \
             --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
             --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
+
+  destroy_infra:
+    name: Destroy Infrastructure with Terraform
+    runs-on: ubuntu-latest
+    # This job runs ONLY if the commit message contains [destroy]
+    if: "contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Or your desired region
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform -chdir=./terraform init
+
+      - name: Terraform Destroy
+        run: terraform -chdir=./terraform destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
