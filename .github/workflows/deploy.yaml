@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: provision_infra # This job runs only after the infra is provisioned
 
-    default:
+    defaults:
       runs:
         working-directory: ./Backend
 
