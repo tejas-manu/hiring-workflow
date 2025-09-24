@@ -9,7 +9,6 @@ permissions:
   id-token: write # Required for configuring AWS credentials
   contents: read
 
-
 jobs:
   provision_infra:
     name: Provision Infrastructure with Terraform
