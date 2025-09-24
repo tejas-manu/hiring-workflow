@@ -59,7 +59,7 @@ jobs:
     needs: provision_infra # This job runs only after the infra is provisioned
 
     defaults:
-      runs:
+      run:
         working-directory: ./Backend
 
     if: "!contains(github.event.head_commit.message, '[destroy]')"
