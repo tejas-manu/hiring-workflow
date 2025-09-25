@@ -205,3 +205,27 @@
 .file-input-hidden {
   display: none;
 }
+
+.file-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #2e7d32;
+}
+
+.remove-btn {
+  background: transparent;
+  border: none;
+  color: #c62828;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.remove-btn:hover {
+  text-decoration: underline;
+}

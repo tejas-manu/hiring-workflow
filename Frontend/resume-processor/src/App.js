@@ -35,6 +35,11 @@ function App() {
     setDragActive(false);
   };
 
+  const handleRemoveFile = () => {
+    setFile(null);
+    setStatus("");
+  };
+
   const handleUpload = async () => {
     if (!file) {
       alert("Please select a PDF first!");
@@ -66,15 +71,15 @@ function App() {
   return (
     <div className="app-container">
       <div className="card">
+        {/* Title */}
+        <h2 className="title">Automated Document Processing</h2>
+
         {/* Architecture Image */}
         <img
           src="/architecture.jpg"
           alt="Architecture Diagram"
           className="architecture-img"
         />
-
-        {/* Title */}
-        <h2 className="title">Automated Document Processing</h2>
 
         {/* Description */}
         <p className="description">
@@ -91,12 +96,23 @@ function App() {
           onDrop={handleDrop}
         >
           <img src="/pdf-icon.jpg" alt="Upload PDF" className="upload-icon" />
-          <p>
-            Drag & Drop your PDF here or{" "}
-            <label htmlFor="file-upload" className="browse">
-              browse
-            </label>
-          </p>
+
+          {file ? (
+            <div className="file-preview">
+              <p>📄 {file.name}</p>
+              <button className="remove-btn" onClick={handleRemoveFile}>
+                ❌ Remove
+              </button>
+            </div>
+          ) : (
+            <p>
+              Drag & Drop your PDF here or{" "}
+              <label htmlFor="file-upload" className="browse">
+                browse
+              </label>
+            </p>
+          )}
+
           <input
             id="file-upload"
             type="file"
@@ -131,7 +147,9 @@ function App() {
             <b>Project Created By:</b>
             <div className="creators">
               <span className="badge">Tejas Manu</span>
+              <span className="badge">Bhavya</span>
               <span className="badge">Pavan</span>
+              <span className="badge">Lahari</span>
             </div>
           </div>
           <div>
