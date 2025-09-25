@@ -7,9 +7,6 @@ function App() {
   const [status, setStatus] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
-  const [email, setEmail] = useState("");
-  const [subStatus, setSubStatus] = useState("");
-
   // 📂 File Handlers
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -69,24 +66,6 @@ function App() {
     } catch (err) {
       console.error("Upload error:", err);
       setStatus("❌ Upload failed.");
-    }
-  };
-
-  // 📧 Subscription Handler
-  const handleSubscribe = async () => {
-    if (!email) {
-      setSubStatus("⚠️ Please enter an email.");
-      return;
-    }
-    try {
-      setSubStatus("Subscribing...");
-      const backendUrl = process.env.REACT_APP_BACKEND_URL;
-      await axios.post(`${backendUrl}/subscribe`, { email });
-      setSubStatus("📧 Check your inbox to confirm subscription!");
-      setEmail("");
-    } catch (err) {
-      console.error("Subscription error:", err);
-      setSubStatus("❌ Subscription failed.");
     }
   };
 
@@ -162,22 +141,6 @@ function App() {
             {status}
           </p>
         )}
-
-        {/* Subscription Section */}
-        <div className="subscription">
-          <h3>Subscribe for Notifications</h3>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="subscribe-input"
-          />
-          <button onClick={handleSubscribe} className="subscribe-btn">
-            Subscribe
-          </button>
-          {subStatus && <p className="status info">{subStatus}</p>}
-        </div>
 
         {/* Footer */}
         <div className="footer">

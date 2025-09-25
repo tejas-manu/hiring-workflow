@@ -229,3 +229,52 @@
 .remove-btn:hover {
   text-decoration: underline;
 }
+
+/* Subscription Section */
+.subscription {
+  margin-top: 40px;
+  text-align: center;
+}
+
+.subscription h3 {
+  font-size: 20px;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.subscribe-form {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.subscribe-input {
+  padding: 10px 14px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  outline: none;
+  min-width: 260px;
+  transition: border 0.3s ease;
+}
+
+.subscribe-input:focus {
+  border-color: #42a5f5;
+  box-shadow: 0 0 4px rgba(66, 165, 245, 0.5);
+}
+
+.subscribe-btn {
+  padding: 10px 20px;
+  font-size: 15px;
+  background: #42a5f5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.subscribe-btn:hover {
+  background: #1e88e5;
+}
