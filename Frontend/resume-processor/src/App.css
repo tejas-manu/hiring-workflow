@@ -1,38 +1,207 @@
-.App {
-  text-align: center;
-}
+/* Import Google Font */
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+/* App container */
+.app-container {
+  font-family: "Roboto", sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-height: 100vh;
+  background: linear-gradient(135deg, #e3f2fd, #f1f8e9);
+  padding: 20px;
+}
+
+/* Card */
+.card {
+  max-width: 950px;
+  width: 100%;
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* Architecture image */
+.architecture-img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto 25px auto;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Title */
+.title {
+  font-size: 32px;
+  margin-bottom: 18px;
+  color: #2e3b4e;
+  font-weight: 700;
+}
+
+/* Description */
+.description {
+  margin-bottom: 25px;
+  color: #555;
+  line-height: 1.7;
+  font-size: 17px;
+  max-width: 750px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* File input */
+.file-input {
+  margin-bottom: 15px;
+  font-size: 15px;
+}
+
+/* Upload button */
+.upload-btn {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.upload-btn:hover {
+  background: linear-gradient(135deg, #43a047, #1b5e20);
+  box-shadow: 0 6px 18px rgba(76, 175, 80, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Status messages */
+.status {
+  margin-top: 18px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.status.success {
+  color: #2e7d32;
+}
+
+.status.error {
+  color: #c62828;
+}
+
+.status.info {
+  color: #333;
+}
+
+/* Footer */
+.footer {
+  margin-top: 35px;
+  font-size: 15px;
+  color: #555;
+}
+
+/* Creator badges */
+.footer .creators {
+  margin-top: 10px;
+}
+
+.footer .badge {
+  display: inline-block;
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Upload area container */
+.upload-area {
+  margin: 25px 0;
+}
+
+/* Styled upload box */
+.upload-box {
+  border: 2px dashed #90caf9;
+  border-radius: 10px;
+  padding: 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  cursor: pointer;
+  transition: background 0.3s ease, border 0.3s ease;
 }
 
-.App-link {
-  color: #61dafb;
+.upload-box:hover {
+  background: #f5faff;
+  border-color: #42a5f5;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* PDF icon */
+.upload-icon {
+  width: 60px;
+  margin-bottom: 15px;
+  opacity: 0.8;
+}
+
+/* Text inside upload box */
+.upload-box p {
+  font-size: 15px;
+  color: #555;
+}
+
+.upload-box .browse {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+/* Hide the raw file input */
+.file-input-hidden {
+  display: none;
+}
+
+/* Upload box */
+.upload-box {
+  border: 2px dashed #90caf9;
+  border-radius: 10px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.3s ease, border 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.upload-box:hover,
+.upload-box.drag-active {
+  background: #f5faff;
+  border-color: #42a5f5;
+}
+
+.upload-icon {
+  width: 60px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+.browse {
+  color: #1976d2;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Hide native input */
+.file-input-hidden {
+  display: none;
 }
