@@ -97,21 +97,20 @@ jobs:
           zip -r ../deployment_package.zip .
 
       - name: Update Lambda Function Code
-        run: |
-          aws lambda update-function-code \
-            --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }} \
-            --zip-file fileb://deployment_package.zip
-
+        run: >
+          aws lambda update-function-code
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+          --zip-file fileb://deployment_package.zip
 
       - name: Wait for Lambda Function Update to Complete
-        run: |
-          aws lambda wait function-updated \
-            --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+        run: >
+          aws lambda wait function-updated
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
       
       - name: Update Lambda Environment Variables
-        run: |
-          aws lambda update-function-configuration\
-          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}\
+        run: >
+          aws lambda update-function-configuration
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
           --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
 
   build_and_deploy_api_lambda:
