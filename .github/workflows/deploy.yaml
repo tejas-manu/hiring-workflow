@@ -53,8 +53,8 @@ jobs:
           echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
           echo "API_GATEWAY_INVOKE_URL=$(terraform output -raw api_gateway_invoke_url)" >> $GITHUB_OUTPUT
 
-          echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
-          echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
+          # echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
+          # echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
         
     outputs:
       PROCESSOR_LAMBDA_NAME: ${{ steps.get_outputs.outputs.PROCESSOR_LAMBDA_NAME }}
@@ -64,8 +64,8 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.get_outputs.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
       API_GATEWAY_INVOKE_URL: ${{ steps.get_outputs.outputs.API_GATEWAY_INVOKE_URL }}
 
-      LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
-      SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
+      # LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
+      # SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
 
 
   build_and_deploy_lambda:
