@@ -1,128 +1,128 @@
-# name: Deploy Resume Processor to AWS
+name: Deploy Resume Processor to AWS
 
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
 
-# permissions:
-#   id-token: write # Required for configuring AWS credentials
-#   contents: read
+permissions:
+  id-token: write # Required for configuring AWS credentials
+  contents: read
 
-# jobs:
-#   provision_infra:
-#     name: Provision Infrastructure with Terraform
-#     runs-on: ubuntu-latest
+jobs:
+  provision_infra:
+    name: Provision Infrastructure with Terraform
+    runs-on: ubuntu-latest
 
-#     if: "!contains(github.event.head_commit.message, '[destroy]')"
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Configure AWS Credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: us-east-1 # Or your desired region
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Or your desired region
 
-#       - name: Setup Terraform
-#         uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-#       - name: Terraform Init
-#         id: init
-#         run: terraform -chdir=./infra init
+      - name: Terraform Init
+        id: init
+        run: terraform -chdir=./infra init
 
-#       - name: Terraform Validate
-#         id: validate
-#         run: terraform -chdir=./infra validate -no-color
+      - name: Terraform Validate
+        id: validate
+        run: terraform -chdir=./infra validate -no-color
 
-#       - name: Terraform Apply
-#         id: apply
-#         run: terraform -chdir=./infra apply -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
+      - name: Terraform Apply
+        id: apply
+        run: terraform -chdir=./infra apply -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
     
-#       - name: Get Terraform Outputs
-#         id: get_outputs
-#         run: |
-#           cd ./infra
-#           echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
-#           echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
+      - name: Get Terraform Outputs
+        id: get_outputs
+        run: |
+          cd ./infra
+          echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
+          echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
         
-#     outputs:
-#       LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
-#       SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
+    outputs:
+      LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
+      SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
 
-#   build_and_deploy_lambda:
-#     name: Build and Deploy Lambda Code
-#     runs-on: ubuntu-latest
-#     needs: provision_infra # This job runs only after the infra is provisioned
+  build_and_deploy_lambda:
+    name: Build and Deploy Lambda Code
+    runs-on: ubuntu-latest
+    needs: provision_infra # This job runs only after the infra is provisioned
 
-#     defaults:
-#       run:
-#         working-directory: ./Backend
+    defaults:
+      run:
+        working-directory: ./Backend
 
-#     if: "!contains(github.event.head_commit.message, '[destroy]')"
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Configure AWS Credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: us-east-1 # Or your desired region
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Or your desired region
 
-#       - name: Build Lambda package using Docker
-#         run: |
-#           docker build --platform linux/amd64 -t lambda-packaging .
-#           docker create --name lambda-temp lambda-packaging
-#           docker cp lambda-temp:/var/task/. ./deployment
-#           docker rm -f lambda-temp
-#           cd deployment
-#           zip -r ../deployment_package.zip .
+      - name: Build Lambda package using Docker
+        run: |
+          docker build --platform linux/amd64 -t lambda-packaging .
+          docker create --name lambda-temp lambda-packaging
+          docker cp lambda-temp:/var/task/. ./deployment
+          docker rm -f lambda-temp
+          cd deployment
+          zip -r ../deployment_package.zip .
 
-#       - name: Update Lambda Function Code
-#         run: |
-#           aws lambda update-function-code \
-#             --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
-#             --zip-file fileb://deployment_package.zip
+      - name: Update Lambda Function Code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://deployment_package.zip
 
-#       - name: Wait for Lambda Function Update to Complete
-#         run: |
-#           aws lambda wait function-updated \
-#             --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }}
+      - name: Wait for Lambda Function Update to Complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }}
       
-#       - name: Update Lambda Environment Variables
-#         run: |
-#           aws lambda update-function-configuration \
-#             --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
-#             --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
+      - name: Update Lambda Environment Variables
+        run: |
+          aws lambda update-function-configuration \
+            --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
+            --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
 
-#   destroy_infra:
-#     name: Destroy Infrastructure with Terraform
-#     runs-on: ubuntu-latest
-#     # This job runs ONLY if the commit message contains [destroy]
-#     if: "contains(github.event.head_commit.message, '[destroy]')"
+  destroy_infra:
+    name: Destroy Infrastructure with Terraform
+    runs-on: ubuntu-latest
+    # This job runs ONLY if the commit message contains [destroy]
+    if: "contains(github.event.head_commit.message, '[destroy]')"
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Configure AWS Credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: us-east-1 # Or your desired region
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Or your desired region
 
-#       - name: Setup Terraform
-#         uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-#       - name: Terraform Init
-#         run: terraform -chdir=./infra init
+      - name: Terraform Init
+        run: terraform -chdir=./infra init
 
-#       - name: Terraform Destroy
-#         run: terraform -chdir=./infra destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
+      - name: Terraform Destroy
+        run: terraform -chdir=./infra destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
