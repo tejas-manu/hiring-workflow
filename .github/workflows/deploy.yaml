@@ -135,13 +135,14 @@ jobs:
           aws-region: us-east-1
       - name: Build Lambda package
         run: |
+          cd ./frontend/app-server
           npm install --production
-          zip -r ../api_package.zip .
+          zip -r ${{ github.workspace }}/api_package.zip .
       - name: Update Lambda Function Code
         run: >
           aws lambda update-function-code
           --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
-          --zip-file fileb://api_package.zip
+          --zip-file fileb://${{ github.workspace }}/api_package.zip
 
   build_and_deploy_frontend:
     name: Build & Deploy Frontend (React)
@@ -172,7 +173,7 @@ jobs:
           REACT_APP_BACKEND_URL: ${{ needs.provision_infra.outputs.API_GATEWAY_ENDPOINT }}
       - name: Deploy to S3
         run: >
-          aws s3 sync ./frontend/build s3://${{ needs.provision_infra.outputs.FRONTEND_S3_BUCKET_NAME }} --delete
+          aws s3 sync ./build s3://${{ needs.provision_infra.outputs.FRONTEND_BUCKET_NAME }} --delete
       - name: Invalidate CloudFront Cache
         run: >
           aws cloudfront create-invalidation
