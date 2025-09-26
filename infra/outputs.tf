@@ -3,10 +3,7 @@
 #   value       = aws_lambda_function.resume_processor_lambda.function_name
 # }
 
-# output "s3_bucket_name" {
-#   description = "The name of the S3 bucket for resumes."
-#   value       = aws_s3_bucket.resume_bucket.bucket
-# }
+
 
 # output "sns_topic_arn" {
 #   description = "The ARN of the SNS topic for notifications."
@@ -62,4 +59,9 @@ output "cloudfront_distribution_id" {
 output "api_gateway_endpoint" {
   description = "The invoke URL for the API Gateway"
   value       = aws_apigatewayv2_stage.default_stage.invoke_url
+}
+
+output "s3_bucket_name" {
+  description = "The name of the S3 bucket for resumes."
+  value       = aws_s3_bucket.resume_bucket.bucket
 }

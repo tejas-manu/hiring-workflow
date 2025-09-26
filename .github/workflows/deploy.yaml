@@ -52,6 +52,7 @@ jobs:
           echo "FRONTEND_BUCKET_NAME=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_OUTPUT
           echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
           echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_OUTPUT
+          echo "RESUME_BUCKET_NAME=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
         
     outputs:
       PROCESSOR_LAMBDA_NAME: ${{ steps.get_outputs.outputs.PROCESSOR_LAMBDA_NAME }}
@@ -60,6 +61,7 @@ jobs:
       FRONTEND_BUCKET_NAME: ${{ steps.get_outputs.outputs.FRONTEND_BUCKET_NAME }}
       CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.get_outputs.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
       API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
+      RESUME_BUCKET_NAME: ${{ steps.get_outputs.outputs.RESUME_BUCKET_NAME }}
 
       # LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
       # SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
@@ -142,6 +144,17 @@ jobs:
           aws lambda update-function-code
           --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
           --zip-file fileb://${{ github.workspace }}/api_package.zip
+        
+      - name: Wait for Lambda Function Update to Complete
+        run: >
+          aws lambda wait function-updated
+          --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
+
+      - name: Update Lambda Environment Variables
+        run: >
+          aws lambda update-function-configuration
+          --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
+          --environment "Variables={BUCKET_NAME=${{ needs.provision_infra.outputs.RESUME_BUCKET_NAME }}}"
 
   build_and_deploy_frontend:
     name: Build & Deploy Frontend (React)
