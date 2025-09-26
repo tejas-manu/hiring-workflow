@@ -135,7 +135,6 @@ jobs:
           aws-region: us-east-1
       - name: Build Lambda package
         run: |
-          cd ./frontend/app-server
           npm install --production
           zip -r ${{ github.workspace }}/api_package.zip .
       - name: Update Lambda Function Code
@@ -165,7 +164,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Build React App
-        working-directory: ./frontend
         run: |
           npm install
           npm run build
