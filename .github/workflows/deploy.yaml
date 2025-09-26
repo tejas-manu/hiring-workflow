@@ -49,20 +49,17 @@ jobs:
           echo "PROCESSOR_LAMBDA_NAME=$(terraform output -raw processor_lambda_name)" >> $GITHUB_OUTPUT
           echo "API_LAMBDA_NAME=$(terraform output -raw api_lambda_name)" >> $GITHUB_OUTPUT
           echo "SNS_TOPIC_ARN=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
-          echo "FRONTEND_S3_BUCKET_NAME=$(terraform output -raw frontend_s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "FRONTEND_BUCKET_NAME=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_OUTPUT
           echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
-          echo "API_GATEWAY_INVOKE_URL=$(terraform output -raw api_gateway_invoke_url)" >> $GITHUB_OUTPUT
-
-          # echo "lambda_function_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
-          # echo "sns_topic_arn=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
+          echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_OUTPUT
         
     outputs:
       PROCESSOR_LAMBDA_NAME: ${{ steps.get_outputs.outputs.PROCESSOR_LAMBDA_NAME }}
       API_LAMBDA_NAME: ${{ steps.get_outputs.outputs.API_LAMBDA_NAME }}
       SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.SNS_TOPIC_ARN }}
-      FRONTEND_S3_BUCKET_NAME: ${{ steps.get_outputs.outputs.FRONTEND_S3_BUCKET_NAME }}
+      FRONTEND_BUCKET_NAME: ${{ steps.get_outputs.outputs.FRONTEND_BUCKET_NAME }}
       CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.get_outputs.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
-      API_GATEWAY_INVOKE_URL: ${{ steps.get_outputs.outputs.API_GATEWAY_INVOKE_URL }}
+      API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
 
       # LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
       # SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
@@ -102,13 +99,14 @@ jobs:
       - name: Update Lambda Function Code
         run: |
           aws lambda update-function-code \
-            --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }} \
+            --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }} \
             --zip-file fileb://deployment_package.zip
+
 
       - name: Wait for Lambda Function Update to Complete
         run: |
           aws lambda wait function-updated \
-            --function-name ${{ needs.provision_infra.outputs.LAMBDA_FUNCTION_NAME }}
+            --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
       
       - name: Update Lambda Environment Variables
         run: |
@@ -172,7 +170,7 @@ jobs:
           npm install
           npm run build
         env:
-          REACT_APP_BACKEND_URL: ${{ needs.provision_infra.outputs.API_GATEWAY_INVOKE_URL }}
+          REACT_APP_BACKEND_URL: ${{ needs.provision_infra.outputs.API_GATEWAY_ENDPOINT }}
       - name: Deploy to S3
         run: >
           aws s3 sync ./frontend/build s3://${{ needs.provision_infra.outputs.FRONTEND_S3_BUCKET_NAME }} --delete
