@@ -34,38 +34,32 @@
 # OUTPUTS
 # ==============================================================================
 
-# Output for the name of the resume processing Lambda function.
 output "processor_lambda_name" {
   description = "The name of the resume processor Lambda function"
   value       = aws_lambda_function.resume_processor_lambda.function_name
 }
 
-# Output for the name of the API Lambda function that generates pre-signed URLs.
 output "api_lambda_name" {
   description = "The name of the API Lambda function for pre-signed URLs"
   value       = aws_lambda_function.api_lambda.function_name
 }
 
-# Output for the API Gateway endpoint URL.
-output "api_gateway_endpoint" {
-  description = "The invoke URL for the API Gateway"
-  value       = aws_apigatewayv2_api.http_api.api_endpoint
+output "sns_topic_arn" {
+  description = "The ARN of the SNS topic for notifications"
+  value       = aws_sns_topic.notifications.arn
 }
 
-# Output for the name of the S3 bucket used for resume uploads.
-output "resume_bucket_name" {
-  description = "The name of the S3 bucket for resume uploads"
-  value       = aws_s3_bucket.resume_bucket.id
-}
-
-# Output for the name of the S3 bucket hosting the frontend static files.
 output "frontend_bucket_name" {
   description = "The name of the S3 bucket for the frontend website files"
   value       = aws_s3_bucket.frontend_bucket.id
 }
 
-# Output for the CloudFront distribution ID.
 output "cloudfront_distribution_id" {
   description = "The ID of the CloudFront distribution for the frontend"
   value       = aws_cloudfront_distribution.frontend_distribution.id
+}
+
+output "api_gateway_endpoint" {
+  description = "The invoke URL for the API Gateway"
+  value       = aws_apigatewayv2_stage.default_stage.invoke_url
 }
