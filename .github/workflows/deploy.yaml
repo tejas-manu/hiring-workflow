@@ -6,7 +6,7 @@ on:
       - automation
 
 permissions:
-  id-token: write # Required for configuring AWS credentials
+  id-token: write
   contents: read
 
 jobs:
@@ -63,14 +63,10 @@ jobs:
       API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
       RESUME_BUCKET_NAME: ${{ steps.get_outputs.outputs.RESUME_BUCKET_NAME }}
 
-      # LAMBDA_FUNCTION_NAME: ${{ steps.get_outputs.outputs.lambda_function_name }}
-      # SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.sns_topic_arn }}
-
-
   build_and_deploy_lambda:
     name: Build and Deploy Lambda Code
     runs-on: ubuntu-latest
-    needs: provision_infra # This job runs only after the infra is provisioned
+    needs: provision_infra
 
     defaults:
       run:
@@ -87,7 +83,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Or your desired region
+          aws-region: us-east-1 
 
       - name: Build Lambda package using Docker
         run: |
