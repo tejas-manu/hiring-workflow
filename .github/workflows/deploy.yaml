@@ -192,6 +192,29 @@ jobs:
           --distribution-id ${{ needs.provision_infra.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
           --paths "/*"
 
+  # Post deployment summary with the CloudFront URL
+  deployment_summary:
+    name: Post Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build_and_deploy_frontend, build_and_deploy_lambda, build_and_deploy_api_lambda, provision_infra]
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Add Deployment URL to Job Summary
+        run: |
+          CLOUDFRONT_URL=$(aws cloudfront get-distribution --id ${{ needs.provision_infra.outputs.CLOUDFRONT_DISTRIBUTION_ID }} --query "Distribution.DomainName" --output text)
+          echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "The application has been successfully deployed and is now available. 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "**Frontend URL:** https://${CLOUDFRONT_URL}" >> $GITHUB_STEP_SUMMARY
+
 
   # Destroy infrastructure if commit message contains [destroy]
   destroy_infra:
