@@ -31,8 +31,6 @@ provider "aws" {
 # GENERAL & SHARED RESOURCES
 # ==============================================================================
 
-# Create a dummy zip file for the initial Lambda deployment.
-# The actual code will be uploaded by the GitHub Actions workflow.
 
 resource "random_id" "bucket_suffix" {
   byte_length = 8
@@ -51,6 +49,7 @@ data "archive_file" "dummy_lambda_package" {
 # BACKEND PROCESSOR (Python Lambda + S3 Upload Bucket + SNS)
 # ==============================================================================
 
+# S3 Bucket for resume uploads (with CORS for CloudFront)
 
 resource "aws_s3_bucket" "resume_bucket" {
   bucket = "${var.project_name}-uploads-${random_id.bucket_suffix.hex}"
@@ -68,7 +67,7 @@ resource "aws_s3_bucket_cors_configuration" "resume_bucket_cors" {
   }
 }
 
-
+# SNS Topic and subscriptions for notifications to reqruiters
 resource "aws_sns_topic" "notifications" {
   name = "${var.project_name}-notifications"
 }
@@ -79,6 +78,7 @@ resource "aws_sns_topic_subscription" "email_subscription" {
   endpoint  = var.notification_email
 }
 
+# IAM Role and Policy for the Lambda function
 resource "aws_iam_role" "lambda_execution_role" {
   name = "${var.project_name}-lambda-execution-role"
 
@@ -136,7 +136,7 @@ resource "aws_iam_role_policy_attachment" "s3_read_only_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
 
-
+# Lambda function to process uploaded resumes
 resource "aws_lambda_function" "resume_processor_lambda" {
   function_name    = "${var.project_name}-function"
   role             = aws_iam_role.lambda_execution_role.arn
@@ -146,13 +146,6 @@ resource "aws_lambda_function" "resume_processor_lambda" {
   memory_size      = 256
   filename         = data.archive_file.dummy_lambda_package.output_path
   source_code_hash = data.archive_file.dummy_lambda_package.output_base64sha256
-
-  # environment {
-  #   variables = {
-  #     GEMINI_API_KEY = "dummy_value"
-  #     SNS_TOPIC_ARN  = aws_sns_topic.notifications.arn
-  #   }
-  # }
 }
 
 # Permission for S3 to invoke the Lambda function
@@ -180,6 +173,7 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 # FRONTEND (S3 Website Bucket + CloudFront)
 # ==============================================================================
 
+# S3 Bucket for frontend hosting (with CloudFront OAC and no public access)
 resource "aws_s3_bucket" "frontend_bucket" {
   bucket = "${var.project_name}-frontend-${random_id.bucket_suffix.hex}"
 }
@@ -192,6 +186,24 @@ resource "aws_s3_bucket_public_access_block" "frontend_bucket_pab" {
   restrict_public_buckets = true
 }
 
+# Bucket Policy to allow CloudFront access to the S3 bucket
+resource "aws_s3_bucket_policy" "frontend_bucket_policy" {
+  bucket = aws_s3_bucket.frontend_bucket.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect    = "Allow",
+      Principal = { Service = "cloudfront.amazonaws.com" },
+      Action    = "s3:GetObject",
+      Resource  = "${aws_s3_bucket.frontend_bucket.arn}/*",
+      Condition = {
+        StringEquals = { "AWS:SourceArn" = aws_cloudfront_distribution.frontend_distribution.arn }
+      }
+    }]
+  })
+}
+
+# CloudFront Distribution with Origin Access Control (OAC) for S3
 resource "aws_cloudfront_origin_access_control" "frontend_oac" {
   name                              = "OAC-${aws_s3_bucket.frontend_bucket.id}"
   description                       = "OAC for frontend S3 bucket"
@@ -236,27 +248,12 @@ resource "aws_cloudfront_distribution" "frontend_distribution" {
   }
 }
 
-resource "aws_s3_bucket_policy" "frontend_bucket_policy" {
-  bucket = aws_s3_bucket.frontend_bucket.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow",
-      Principal = { Service = "cloudfront.amazonaws.com" },
-      Action    = "s3:GetObject",
-      Resource  = "${aws_s3_bucket.frontend_bucket.arn}/*",
-      Condition = {
-        StringEquals = { "AWS:SourceArn" = aws_cloudfront_distribution.frontend_distribution.arn }
-      }
-    }]
-  })
-}
 
 # ==============================================================================
 # API (API Gateway + Node.js Lambda for Pre-signed URLs)
 # ==============================================================================
 
-
+# IAM Role and Policy for the API Lambda function
 resource "aws_iam_role" "api_lambda_role" {
   name = "${var.project_name}-api-role"
   assume_role_policy = jsonencode({
@@ -293,15 +290,17 @@ resource "aws_iam_role_policy_attachment" "api_lambda_policy_attach" {
   policy_arn = aws_iam_policy.api_lambda_policy.arn
 }
 
+# Lambda function to generate pre-signed URLs for S3 uploads
 resource "aws_lambda_function" "api_lambda" {
   function_name    = "${var.project_name}-api"
   role             = aws_iam_role.api_lambda_role.arn
-  handler          = "getPresignedUrl-handler.handler" # Assumes node file is getPresignedUrl-handler.js
+  handler          = "getPresignedUrl-handler.handler" 
   runtime          = "nodejs18.x"
   filename         = data.archive_file.dummy_lambda_package.output_path
   source_code_hash = data.archive_file.dummy_lambda_package.output_base64sha256
 }
 
+# API Gateway HTTP API integrated with the Lambda
 resource "aws_apigatewayv2_api" "http_api" {
   name          = "${var.project_name}-api"
   protocol_type = "HTTP"

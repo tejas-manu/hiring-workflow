@@ -10,6 +10,8 @@ permissions:
   contents: read
 
 jobs:
+
+  #Provision infrastructure using Terraform
   provision_infra:
     name: Provision Infrastructure with Terraform
     runs-on: ubuntu-latest
@@ -25,7 +27,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Or your desired region
+          aws-region: us-east-1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -63,6 +65,7 @@ jobs:
       API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
       RESUME_BUCKET_NAME: ${{ steps.get_outputs.outputs.RESUME_BUCKET_NAME }}
 
+  # Build and deploy the Lambda function code for processing resumes
   build_and_deploy_lambda:
     name: Build and Deploy Lambda Code
     runs-on: ubuntu-latest
@@ -111,6 +114,7 @@ jobs:
           --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
           --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
 
+  # Build and deploy the API Lambda function to generate pre-signed URLs for S3 uploads
   build_and_deploy_api_lambda:
     name: Build & Deploy API Lambda (Node.js)
     runs-on: ubuntu-latest
@@ -152,6 +156,7 @@ jobs:
           --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
           --environment "Variables={BUCKET_NAME=${{ needs.provision_infra.outputs.RESUME_BUCKET_NAME }}}"
 
+  # Build and deploy the React frontend to S3 and invalidate CloudFront cache
   build_and_deploy_frontend:
     name: Build & Deploy Frontend (React)
     runs-on: ubuntu-latest
@@ -188,7 +193,7 @@ jobs:
           --paths "/*"
 
 
-
+  # Destroy infrastructure if commit message contains [destroy]
   destroy_infra:
     name: Destroy Infrastructure with Terraform
     runs-on: ubuntu-latest
@@ -204,7 +209,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Or your desired region
+          aws-region: us-east-1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
