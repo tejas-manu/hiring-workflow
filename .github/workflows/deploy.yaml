@@ -3,7 +3,7 @@ name: Deploy Resume Processor to AWS
 on:
   push:
     branches:
-      - main
+      - automation
 
 permissions:
   id-token: write # Required for configuring AWS credentials
