@@ -7,6 +7,13 @@ function App() {
   const [status, setStatus] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
+  // 🆕 New Form Fields
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [dob, setDob] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
   // 📂 File Handlers
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -62,6 +69,9 @@ function App() {
         headers: { "Content-Type": "application/pdf" },
       });
 
+      // You could also send form data (firstName, etc.) to your backend here
+      console.log("Form Data:", { firstName, lastName, dob, email, phone });
+
       setStatus("✅ Upload successful!");
     } catch (err) {
       console.error("Upload error:", err);
@@ -73,21 +83,47 @@ function App() {
     <div className="app-container">
       <div className="card">
         {/* Title */}
-        <h2 className="title">Automated Resume Processing</h2>
-
-        {/* Architecture Image */}
-        <img
-          src="/architecture.jpg"
-          alt="Architecture Diagram"
-          className="architecture-img"
-        />
+        <h2 className="title">Resume Screening</h2>
 
         {/* Description */}
-        <p className="description">
-          Upload PDFs into <b>AWS S3</b> and let <b>AWS Lambda</b> trigger{" "}
-          <b>Gemini AI</b> for intelligent processing. Results are sent via{" "}
-          <b>AWS SNS</b> and delivered to <b>Gmail</b> in real-time.
-        </p>
+
+        {/* 🆕 Personal Details Form */}
+        <div className="form-section">
+          <input
+            type="text"
+            placeholder="First Name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="form-input"
+          />
+          <input
+            type="text"
+            placeholder="Last Name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="form-input"
+          />
+          <input
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            className="form-input"
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="form-input"
+          />
+          <input
+            type="tel"
+            placeholder="Phone Number"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="form-input"
+          />
+        </div>
 
         {/* Upload Section */}
         <div
@@ -152,9 +188,6 @@ function App() {
               <span className="badge">Pavan</span>
               <span className="badge">Lahari</span>
             </div>
-          </div>
-          <div>
-            <b>Location:</b> Cloud Native • AWS Infrastructure
           </div>
         </div>
       </div>
