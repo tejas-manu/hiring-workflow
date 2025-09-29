@@ -3,7 +3,7 @@ name: Deploy Resume Processor to AWS
 on:
   push:
     branches:
-      - frontend
+      - main
 
 permissions:
   id-token: write
