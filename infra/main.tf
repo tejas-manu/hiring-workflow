@@ -176,6 +176,7 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 # S3 Bucket for frontend hosting (with CloudFront OAC and no public access)
 resource "aws_s3_bucket" "frontend_bucket" {
   bucket = "${var.project_name}-frontend-${random_id.bucket_suffix.hex}"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend_bucket_pab" {
