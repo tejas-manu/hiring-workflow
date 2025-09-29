@@ -1,0 +1,244 @@
+name: Deploy Resume Processor to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  #Provision infrastructure using Terraform
+  provision_infra:
+    name: Provision Infrastructure with Terraform
+    runs-on: ubuntu-latest
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        id: init
+        run: terraform -chdir=./infra init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform -chdir=./infra validate -no-color
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform -chdir=./infra apply -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"
+    
+      - name: Get Terraform Outputs
+        id: get_outputs
+        run: |
+          cd ./infra
+          echo "PROCESSOR_LAMBDA_NAME=$(terraform output -raw processor_lambda_name)" >> $GITHUB_OUTPUT
+          echo "API_LAMBDA_NAME=$(terraform output -raw api_lambda_name)" >> $GITHUB_OUTPUT
+          echo "SNS_TOPIC_ARN=$(terraform output -raw sns_topic_arn)" >> $GITHUB_OUTPUT
+          echo "FRONTEND_BUCKET_NAME=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_OUTPUT
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_OUTPUT
+          echo "RESUME_BUCKET_NAME=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+        
+    outputs:
+      PROCESSOR_LAMBDA_NAME: ${{ steps.get_outputs.outputs.PROCESSOR_LAMBDA_NAME }}
+      API_LAMBDA_NAME: ${{ steps.get_outputs.outputs.API_LAMBDA_NAME }}
+      SNS_TOPIC_ARN: ${{ steps.get_outputs.outputs.SNS_TOPIC_ARN }}
+      FRONTEND_BUCKET_NAME: ${{ steps.get_outputs.outputs.FRONTEND_BUCKET_NAME }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.get_outputs.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
+      API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
+      RESUME_BUCKET_NAME: ${{ steps.get_outputs.outputs.RESUME_BUCKET_NAME }}
+
+  # Build and deploy the Lambda function code for processing resumes
+  build_and_deploy_lambda:
+    name: Build and Deploy Lambda Code
+    runs-on: ubuntu-latest
+    needs: provision_infra
+
+    defaults:
+      run:
+        working-directory: ./Backend
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
+
+      - name: Build Lambda package using Docker
+        run: |
+          docker build --platform linux/amd64 -t lambda-packaging .
+          docker create --name lambda-temp lambda-packaging
+          docker cp lambda-temp:/var/task/. ./deployment
+          docker rm -f lambda-temp
+          cd deployment
+          zip -r ../deployment_package.zip .
+
+      - name: Update Lambda Function Code
+        run: >
+          aws lambda update-function-code
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+          --zip-file fileb://deployment_package.zip
+
+      - name: Wait for Lambda Function Update to Complete
+        run: >
+          aws lambda wait function-updated
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+      
+      - name: Update Lambda Environment Variables
+        run: >
+          aws lambda update-function-configuration
+          --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+          --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
+
+  # Build and deploy the API Lambda function to generate pre-signed URLs for S3 uploads
+  build_and_deploy_api_lambda:
+    name: Build & Deploy API Lambda (Node.js)
+    runs-on: ubuntu-latest
+    needs: provision_infra
+
+    defaults:
+      run:
+        working-directory: ./Frontend/app-server
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Build Lambda package
+        run: |
+          npm install --production
+          zip -r ${{ github.workspace }}/api_package.zip .
+      - name: Update Lambda Function Code
+        run: >
+          aws lambda update-function-code
+          --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
+          --zip-file fileb://${{ github.workspace }}/api_package.zip
+        
+      - name: Wait for Lambda Function Update to Complete
+        run: >
+          aws lambda wait function-updated
+          --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
+
+      - name: Update Lambda Environment Variables
+        run: >
+          aws lambda update-function-configuration
+          --function-name ${{ needs.provision_infra.outputs.API_LAMBDA_NAME }}
+          --environment "Variables={BUCKET_NAME=${{ needs.provision_infra.outputs.RESUME_BUCKET_NAME }}}"
+
+  # Build and deploy the React frontend to S3 and invalidate CloudFront cache
+  build_and_deploy_frontend:
+    name: Build & Deploy Frontend (React)
+    runs-on: ubuntu-latest
+    needs: provision_infra
+
+    defaults:
+      run:
+        working-directory: ./Frontend/resume-processor
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Build React App
+        run: |
+          npm install
+          npm run build
+        env:
+          REACT_APP_BACKEND_URL: ${{ needs.provision_infra.outputs.API_GATEWAY_ENDPOINT }}
+      - name: Deploy to S3
+        run: >
+          aws s3 sync ./build s3://${{ needs.provision_infra.outputs.FRONTEND_BUCKET_NAME }} --delete
+      - name: Invalidate CloudFront Cache
+        run: >
+          aws cloudfront create-invalidation
+          --distribution-id ${{ needs.provision_infra.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
+          --paths "/*"
+
+  # Post deployment summary with the CloudFront URL
+  deployment_summary:
+    name: Post Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build_and_deploy_frontend, build_and_deploy_lambda, build_and_deploy_api_lambda, provision_infra]
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Add Deployment URL to Job Summary
+        run: |
+          CLOUDFRONT_URL=$(aws cloudfront get-distribution --id ${{ needs.provision_infra.outputs.CLOUDFRONT_DISTRIBUTION_ID }} --query "Distribution.DomainName" --output text)
+          echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "The application has been successfully deployed and is now available. 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "**Frontend URL:** https://${CLOUDFRONT_URL}" >> $GITHUB_STEP_SUMMARY
+
+
+  # Destroy infrastructure if commit message contains [destroy]
+  destroy_infra:
+    name: Destroy Infrastructure with Terraform
+    runs-on: ubuntu-latest
+
+    if: "contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform -chdir=./infra init
+
+      - name: Terraform Destroy
+        run: terraform -chdir=./infra destroy -auto-approve -var="notification_email=${{ secrets.NOTIFICATION_EMAIL }}"

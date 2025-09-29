@@ -13,6 +13,4 @@ variable "project_name" {
 variable "notification_email" {
   description = "The email address to receive notifications from the SNS topic."
   type        = string
-  # IMPORTANT: You must provide a valid email address for the SNS subscription.
-  # You can set this in a terraform.tfvars file or as a secret in your CI/CD pipeline.
 }
