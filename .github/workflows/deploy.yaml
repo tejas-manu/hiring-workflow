@@ -73,7 +73,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./Backend
+        working-directory: ./Backend/ResumeProcessorLambda
 
     if: "!contains(github.event.head_commit.message, '[destroy]')"
 
@@ -122,7 +122,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./Frontend/app-server
+        working-directory: ./Backend/AppServerLambda
 
     if: "!contains(github.event.head_commit.message, '[destroy]')"
 
