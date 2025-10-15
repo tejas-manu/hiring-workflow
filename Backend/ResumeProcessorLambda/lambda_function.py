@@ -12,209 +12,197 @@ logger.setLevel(logging.INFO)
 # Initialize AWS clients
 s3_client = boto3.client('s3')
 sns_client = boto3.client('sns')
+dynamo_client = boto3.client('dynamodb')
 
 # Load environment variables
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN')
+JOB_TABLE = os.environ.get('JOB_TABLE')
 
-if not all([GEMINI_API_KEY, SNS_TOPIC_ARN]):
-    logger.error("Missing one or more required environment variables.")
-    # In a real-world scenario, you might want to raise an exception here.
-    # For this example, we'll continue with placeholders.
-    GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
-    SNS_TOPIC_ARN = "arn:aws:sns:REGION:ACCOUNT_ID:YOUR_TOPIC_NAME"
+if not all([GEMINI_API_KEY, SNS_TOPIC_ARN, JOB_TABLE]):
+    logger.warning("Missing one or more environment variables.")
 
-# Define the structured schema for Gemini's response.
-# This ensures the API returns a consistent JSON object.
-RESUME_SCHEMA = {
+# 🧩 Updated schema to include match percentage
+RESUME_MATCH_SCHEMA = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "phone_number": {"type": "string"},
         "email": {"type": "string"},
-        "skills": {
-            "type": "array",
-            "items": {"type": "string"}
+        "skills": {"type": "array", "items": {"type": "string"}},
+        "companies_worked_for": {"type": "array", "items": {"type": "string"}},
+        "match_percentage": {
+            "type": "number",
+            "description": "How well this resume fits the job (0–100)."
         },
-        "companies_worked_for": {
-            "type": "array",
-            "items": {"type": "string"}
-        }
+        "key_strengths": {"type": "array", "items": {"type": "string"}},
+        "missing_skills": {"type": "array", "items": {"type": "string"}}
     },
-    "required": ["name", "email"]
+    "required": ["name", "email", "match_percentage"]
 }
 
+
 def extract_pdf_text(file_path):
-    """
-    Extracts all text from a PDF file.
-
-    Args:
-        file_path (str): The path to the PDF file.
-
-    Returns:
-        str: The extracted text content.
-    """
+    """Extract text from PDF."""
     try:
         import pdfplumber
         with pdfplumber.open(file_path) as pdf:
-            full_text = ""
+            text = ""
             for page in pdf.pages:
-                full_text += page.extract_text() or ""
-            return full_text
+                text += page.extract_text() or ""
+            return text
     except Exception as e:
-        logger.error(f"Error extracting text from PDF: {e}")
+        logger.error(f"Error extracting text: {e}")
         return ""
 
-def process_resume_with_gemini(resume_text):
-    """
-    Sends resume text to the Gemini API to extract structured information.
 
-    Args:
-        resume_text (str): The full text of the resume.
+def get_job_from_dynamo(job_id):
+    """Fetch job title & description from DynamoDB using job_id."""
+    try:
+        response = dynamo_client.get_item(
+            TableName=JOB_TABLE,
+            Key={"jobId": {"S": job_id}}
+        )
+        item = response.get('Item', {})
+        if not item:
+            logger.warning(f"No job found for jobId={job_id}")
+            return None, None
+        title = item.get('title', {}).get('S', 'N/A')
+        description = item.get('description', {}).get('S', 'N/A')
+        return title, description
+    except Exception as e:
+        logger.error(f"Error fetching job from DynamoDB: {e}")
+        return None, None
 
-    Returns:
-        dict or None: A dictionary containing the extracted details, or None on failure.
-    """
+
+def process_resume_with_gemini(resume_text, job_title=None, job_description=None):
+    """Send resume and job info to Gemini and get structured match output."""
     if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_GEMINI_API_KEY":
-        logger.error("Gemini API key is not set. Skipping API call.")
+        logger.error("Gemini API key missing.")
         return None
 
-    # Construct the prompt for the LLM
     prompt = f"""
-    Analyze the following resume text and extract the key information.
-    Provide the name, phone number, email, a list of professional skills,
-    and a list of company names where the person has worked.
+    You are a career matching assistant.
+    Compare the following candidate resume with the provided job role and description.
+    Output JSON only with:
+      - name
+      - email
+      - list of skills
+      - list of companies_worked_for
+      - match_percentage (0–100)
+      - key_strengths (skills that match job requirements)
+      - missing_skills (important skills missing for this job)
+      
+    Job Role: {job_title or "N/A"}
+    Job Description: {job_description or "N/A"}
+
     Resume Text:
     ---
     {resume_text}
     ---
     """
-    
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={GEMINI_API_KEY}"
-    
-    # We use a structured JSON response to ensure the output is parseable.
+
+    api_url = (
+        f"https://generativelanguage.googleapis.com/v1beta/"
+        f"models/gemini-2.5-flash-preview-05-20:generateContent?key={GEMINI_API_KEY}"
+    )
+
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "responseSchema": RESUME_SCHEMA
+            "responseSchema": RESUME_MATCH_SCHEMA
         }
     }
 
-    headers = {
-        "Content-Type": "application/json"
-    }
-
     try:
-        response = requests.post(api_url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
-        
-        # Parse the JSON response
+        response = requests.post(api_url, headers={"Content-Type": "application/json"}, data=json.dumps(payload))
+        response.raise_for_status()
         result = response.json()
-        
-        # Extract the content text from the nested JSON structure
-        json_string = result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '{}')
-        
+        json_string = result['candidates'][0]['content']['parts'][0]['text']
         return json.loads(json_string)
+    except Exception as e:
+        logger.error(f"Gemini API call failed: {e}")
+        logger.error(f"Raw response: {response.text if 'response' in locals() else 'No response'}")
+        return None
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error during Gemini API call: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse JSON response from Gemini: {e}")
-        logger.error(f"Raw response text: {response.text}")
-        return None
 
 def publish_to_sns(subject, message):
-    """
-    Publishes a message to an SNS topic.
-
-    Args:
-        subject (str): The subject of the message.
-        message (str): The body of the message.
-    """
+    """Publish a message to SNS."""
     try:
         sns_client.publish(
             TopicArn=SNS_TOPIC_ARN,
             Subject=subject,
             Message=message
         )
-        logger.info(f"Message published to SNS topic: {SNS_TOPIC_ARN}")
+        logger.info("Message published to SNS.")
     except Exception as e:
-        logger.error(f"Error publishing to SNS: {e}")
+        logger.error(f"Error publishing SNS: {e}")
+
 
 def lambda_handler(event, context):
-    """
-    The main handler for the AWS Lambda function.
+    """Lambda handler triggered by S3 upload event."""
+    logger.info("Lambda triggered.")
+    logger.info(json.dumps(event))
 
-    This function is triggered by an S3 event. It downloads the PDF,
-    extracts information using Gemini, and publishes a summary message via SNS.
-    """
-    logger.info("Lambda function triggered.")
-    # Log the full S3 event payload for debugging purposes
-    logger.info("S3 Event Payload: " + json.dumps(event))
-    
-    # Get the S3 bucket and file key from the event
+    # ✅ Get S3 bucket & key
     try:
-        bucket = event['Records'][0]['s3']['bucket']['name']
-        key = event['Records'][0]['s3']['object']['key']
-        logger.info(f"New object '{key}' uploaded to bucket '{bucket}'.")
+        record = event['Records'][0]
+        bucket = record['s3']['bucket']['name']
+        key = record['s3']['object']['key']
+        logger.info(f"S3 upload detected: bucket={bucket}, key={key}")
     except KeyError:
-        logger.error("S3 event record not found or malformed.")
-        return {'statusCode': 400, 'body': json.dumps('Invalid S3 event.')}
+        return {'statusCode': 400, 'body': json.dumps("Invalid S3 event structure.")}
 
-    # Use a temporary file path for the Lambda environment
-    download_path = os.path.join(tempfile.gettempdir(), key)
-    
-    # Download the file from S3
+    # ✅ Extract jobId from S3 key path (uploads/{jobId}/{filename})
+    try:
+        parts = key.split('/')
+        job_id = parts[1] if len(parts) > 1 else 'default'
+        logger.info(f"✅ Extracted jobId from key path: {job_id}")
+    except Exception as e:
+        logger.warning(f"Could not parse jobId from key: {e}")
+        job_id = 'default'
+
+    # ✅ Download the PDF
+    download_path = os.path.join(tempfile.gettempdir(), os.path.basename(key))
     try:
         s3_client.download_file(bucket, key, download_path)
-        logger.info(f"File downloaded to {download_path}")
+        logger.info(f"Downloaded file: {download_path}")
     except Exception as e:
-        logger.error(f"Error downloading file from S3: {e}")
-        return {'statusCode': 500, 'body': json.dumps('Failed to download file.')}
+        logger.error(f"Error downloading file: {e}")
+        return {'statusCode': 500, 'body': json.dumps("Download failed.")}
 
-    # Extract text from the PDF
+    # ✅ Extract resume text
     resume_text = extract_pdf_text(download_path)
-    if not resume_text:
-        return {'statusCode': 500, 'body': json.dumps('Failed to extract text from PDF.')}
-
-    # Process the text with the Gemini API
-    extracted_details = process_resume_with_gemini(resume_text)
-    
-    # Clean up the temporary file
     os.remove(download_path)
 
-    logger.info(f"File downloaded to {extracted_details}")
-    
-    if extracted_details:
-        # Construct the email body from the extracted details
-        name = extracted_details.get('name', 'N/A')
-        email = extracted_details.get('email', 'N/A')
-        phone = extracted_details.get('phone_number', 'N/A')
-        skills = ", ".join(extracted_details.get('skills', ['N/A']))
-        companies = ", ".join(extracted_details.get('companies_worked_for', ['N/A']))
-        
-        email_subject = f"New Resume Processed: {name}"
-        email_body = f"""
-        A new resume has been uploaded and processed.
+    if not resume_text:
+        return {'statusCode': 500, 'body': json.dumps("Failed to extract resume text.")}
 
-        Here are the extracted details:
-        Name: {name}
-        Email: {email}
-        Phone: {phone}
-        Skills: {skills}
-        Companies: {companies}
+    # ✅ Get job info from DynamoDB
+    job_title, job_description = get_job_from_dynamo(job_id)
 
-        The original PDF file name was: {key}
-        """
-        
-        # Publish the summary to the SNS topic
-        publish_to_sns(email_subject, email_body)
-    else:
-        logger.warning("No details could be extracted from the resume. No SNS message published.")
-        
+    # ✅ Compare resume with job using Gemini
+    result = process_resume_with_gemini(resume_text, job_title, job_description)
+
+    if not result:
+        return {'statusCode': 500, 'body': json.dumps("Gemini processing failed.")}
+
+    # ✅ Publish summary to SNS
+    summary = f"""
+    Resume Match Analysis:
+    Candidate: {result.get('name')}
+    Email: {result.get('email')}
+    Job Role: {job_title}
+    Match: {result.get('match_percentage')}%
+    Key Strengths: {', '.join(result.get('key_strengths', []))}
+    Missing Skills: {', '.join(result.get('missing_skills', []))}
+    """
+    publish_to_sns(f"Resume Match Result - {job_title}", summary)
+
     return {
         'statusCode': 200,
-        'body': json.dumps('Lambda function executed successfully!')
+        'body': json.dumps({
+            'message': 'Resume processed successfully',
+            'match_result': result
+        })
     }
