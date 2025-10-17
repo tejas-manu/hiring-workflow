@@ -1,9 +1,9 @@
 terraform {
 
   backend "s3" {
-    bucket = "my-terraform-state-bucket-personal"
+    bucket = "my-terraform-state-bucket-personal-123"
     key    = "resume-workflow/terraform.tfstate"
-    region = "us-east-1"
+    region = "us-east-2"
         
   }
   required_providers {
