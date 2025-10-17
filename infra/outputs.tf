@@ -3,6 +3,11 @@ output "processor_lambda_name" {
   value       = aws_lambda_function.resume_processor_lambda.function_name
 }
 
+output "job_description_lambda_name" {
+  description = "The name of the job description Lambda function"
+  value       = aws_lambda_function.job_api_handler.function_name
+}
+
 output "api_lambda_name" {
   description = "The name of the API Lambda function for pre-signed URLs"
   value       = aws_lambda_function.api_lambda.function_name

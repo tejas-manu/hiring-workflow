@@ -3,7 +3,7 @@ name: Deploy Resume Processor to AWS
 on:
   push:
     branches:
-      - automation
+      - deployment
 
 permissions:
   id-token: write
@@ -55,6 +55,7 @@ jobs:
           echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
           echo "API_GATEWAY_ENDPOINT=$(terraform output -raw api_gateway_endpoint)" >> $GITHUB_OUTPUT
           echo "RESUME_BUCKET_NAME=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "JOB_DESCRIPTION_LAMBDA_NAME=$(terraform output -raw job_description_lambda_name)" >> $GITHUB_OUTPUT
         
     outputs:
       PROCESSOR_LAMBDA_NAME: ${{ steps.get_outputs.outputs.PROCESSOR_LAMBDA_NAME }}
@@ -64,6 +65,7 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.get_outputs.outputs.CLOUDFRONT_DISTRIBUTION_ID }}
       API_GATEWAY_ENDPOINT: ${{ steps.get_outputs.outputs.API_GATEWAY_ENDPOINT }}
       RESUME_BUCKET_NAME: ${{ steps.get_outputs.outputs.RESUME_BUCKET_NAME }}
+      JOB_DESCRIPTION_LAMBDA_NAME: ${{ steps.get_outputs.outputs.JOB_DESCRIPTION_LAMBDA_NAME }}
 
   # Build and deploy the Lambda function code for processing resumes
   build_and_deploy_lambda:
@@ -214,6 +216,55 @@ jobs:
           echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "The application has been successfully deployed and is now available. 🚀" >> $GITHUB_STEP_SUMMARY
           echo "**Frontend URL:** https://${CLOUDFRONT_URL}" >> $GITHUB_STEP_SUMMARY
+
+
+  build_and_deploy_job_description_lambda:
+    name: Build & Deploy Job Description Lambda
+    runs-on: ubuntu-latest
+    needs: provision_infra
+
+    defaults:
+      run:
+        working-directory: ./Backend/FetchJobdescription
+
+    if: "!contains(github.event.head_commit.message, '[destroy]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
+
+      - name: Build Lambda package using Docker
+        run: |
+          docker build --platform linux/amd64 -t lambda-packaging .
+          docker create --name lambda-temp lambda-packaging
+          docker cp lambda-temp:/var/task/. ./deployment
+          docker rm -f lambda-temp
+          cd deployment
+          zip -r ../deployment_package.zip .
+
+      - name: Update Lambda Function Code
+        run: >
+          aws lambda update-function-code
+          --function-name ${{ needs.provision_infra.outputs.JOB_DESCRIPTION_LAMBDA_NAME }}
+          --zip-file fileb://deployment_package.zip
+
+      - name: Wait for Lambda Function Update to Complete
+        run: >
+          aws lambda wait function-updated
+          --function-name ${{ needs.provision_infra.outputs.JOB_DESCRIPTION_LAMBDA_NAME }}
+      
+      # - name: Update Lambda Environment Variables
+      #   run: >
+      #     aws lambda update-function-configuration
+      #     --function-name ${{ needs.provision_infra.outputs.PROCESSOR_LAMBDA_NAME }}
+      #     --environment "Variables={GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SNS_TOPIC_ARN=${{ needs.provision_infra.outputs.SNS_TOPIC_ARN }}}"
 
 
   # Destroy infrastructure if commit message contains [destroy]
