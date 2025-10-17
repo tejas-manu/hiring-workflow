@@ -349,7 +349,7 @@ resource "aws_lambda_permission" "allow_api_gateway_invoke_api" {
 resource "aws_dynamodb_table" "job_table" {
   name           = "${var.project_name}-jobs"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
+  hash_key       = "jobId"
 
   attribute {
     name = "jobId"
