@@ -8,35 +8,46 @@ function Dashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
   const { jobId } = useParams();
+
+  // Normalize base URL (remove any trailing slash)
+  const backendBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
 
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (!user) navigate("/");
 
-    // ✅ Fetch all job roles
     const fetchJobs = async () => {
+      setLoading(true);
+      setError("");
       try {
-        const backendUrl = process.env.REACT_APP_BACKEND_URL;
-        const res = await axios.get(`${backendUrl}/getJobRoles`);
-        const jobList = res.data;
+        // GET /getJobRoles → returns a list of jobs
+        const res = await axios.get(`${backendBase}/getJobRoles`);
+        const jobList = Array.isArray(res.data) ? res.data : [];
         setJobs(jobList);
 
-        // If route has /jobs/:jobId, pre-select that job
+        // Pre-select from route /jobs/:jobId, or default to first
         if (jobId) {
           const found = jobList.find((j) => j.id === jobId);
           if (found) setSelectedJob(found);
+          else if (jobList.length > 0) setSelectedJob(jobList[0]);
         } else if (jobList.length > 0) {
           setSelectedJob(jobList[0]);
         }
       } catch (err) {
         console.error("Error fetching jobs:", err);
+        setError("Failed to load job roles. Please try again.");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchJobs();
-  }, [navigate, jobId]);
+  }, [navigate, jobId, backendBase]);
 
   const handleJobClick = (job) => {
     setSelectedJob(job);
@@ -52,17 +63,21 @@ function Dashboard() {
 
     try {
       setStatus("Requesting upload URL...");
-      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      setError("");
 
-      // ✅ Send jobId along with file name
-      const res = await axios.get(`${backendUrl}/getPresignedUrl`, {
+      // GET /getPresignedUrl?name=...&jobId=...
+      const res = await axios.get(`${backendBase}/getPresignedUrl`, {
         params: { name: file.name, jobId: selectedJob.id },
       });
 
-      const { url } = res.data;
-      setStatus("Uploading PDF to S3...");
+      const { url } = res.data || {};
+      if (!url) {
+        setStatus("");
+        setError("Did not receive a presigned URL from the server.");
+        return;
+      }
 
-      // ✅ Upload to S3
+      setStatus("Uploading PDF to S3...");
       await axios.put(url, file, {
         headers: { "Content-Type": "application/pdf" },
       });
@@ -71,7 +86,8 @@ function Dashboard() {
       setFile(null);
     } catch (err) {
       console.error("Upload error:", err);
-      setStatus("❌ Failed to upload file");
+      setStatus("");
+      setError("❌ Failed to upload file");
     }
   };
 
@@ -84,18 +100,28 @@ function Dashboard() {
     <div className="dashboard-container">
       {/* Sidebar */}
       <div className="sidebar">
-        <h3>Job Roles</h3>
-        <ul>
-          {jobs.map((job) => (
-            <li
-              key={job.id}
-              className={selectedJob?.id === job.id ? "active" : ""}
-              onClick={() => handleJobClick(job)}
-            >
-              {job.title}
-            </li>
-          ))}
-        </ul>
+        <div className="sidebar-header">
+          <h3>Job Roles</h3>
+          <button className="logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+        {loading ? (
+          <p>Loading roles…</p>
+        ) : (
+          <ul>
+            {jobs.map((job) => (
+              <li
+                key={job.id}
+                className={selectedJob?.id === job.id ? "active" : ""}
+                onClick={() => handleJobClick(job)}
+              >
+                {job.title}
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && <p className="error">{error}</p>}
       </div>
 
       {/* Main Content */}
@@ -160,6 +186,7 @@ function Dashboard() {
         </div>
 
         {status && <p className="status">{status}</p>}
+        {error && <p className="error">{error}</p>}
       </div>
     </div>
   );
