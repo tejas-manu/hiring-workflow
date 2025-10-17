@@ -401,3 +401,4 @@ resource "aws_lambda_permission" "allow_api_invoke_jobs_lambda" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
 }
+
