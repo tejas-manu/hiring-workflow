@@ -124,7 +124,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./Backend/AppServerLambda
+        working-directory: ./Backend/getpresignedUrl
 
     if: "!contains(github.event.head_commit.message, '[destroy]')"
 
