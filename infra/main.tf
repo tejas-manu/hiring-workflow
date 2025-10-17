@@ -1,9 +1,9 @@
 terraform {
 
   backend "s3" {
-    bucket = "my-terraform-state-bucket-personal"
+    bucket = "my-terraform-state-bucket-personal-123"
     key    = "resume-workflow/terraform.tfstate"
-    region = "us-east-1"
+    region = "us-east-2"
         
   }
   required_providers {
@@ -282,6 +282,11 @@ resource "aws_iam_policy" "api_lambda_policy" {
         Effect   = "Allow",
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
         Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:Scan", "dynamodb:GetItem"],
+        Resource = aws_dynamodb_table.job_table.arn
       }
     ]
   })
@@ -297,7 +302,9 @@ resource "aws_lambda_function" "api_lambda" {
   function_name    = "${var.project_name}-api"
   role             = aws_iam_role.api_lambda_role.arn
   handler          = "getPresignedUrl-handler.handler" 
-  runtime          = "nodejs18.x"
+  runtime          = "python3.13"
+  timeout          = 180
+  memory_size      = 256
   filename         = data.archive_file.dummy_lambda_package.output_path
   source_code_hash = data.archive_file.dummy_lambda_package.output_base64sha256
 }
@@ -335,6 +342,64 @@ resource "aws_lambda_permission" "allow_api_gateway_invoke_api" {
   statement_id  = "AllowAPIGatewayInvokeAPI"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
+}
+
+
+# ==============================================================================
+resource "aws_dynamodb_table" "job_table" {
+  name           = "${var.project_name}-jobs"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "jobId"
+
+  attribute {
+    name = "jobId"
+    type = "S"
+  }
+}
+
+
+resource "aws_lambda_function" "job_api_handler" {
+  function_name    = "${var.project_name}-job-api-handler"
+  handler          = "fetch_job_description.handler"
+  runtime          = "python3.11"
+  role             = aws_iam_role.api_lambda_role.arn
+  filename         = data.archive_file.dummy_lambda_package.output_path
+  source_code_hash = data.archive_file.dummy_lambda_package.output_base64sha256
+
+  environment {
+    variables = {
+      JOB_TABLE = aws_dynamodb_table.job_table.name
+    }
+  }
+}
+
+resource "aws_apigatewayv2_integration" "jobs_lambda_integration" {
+  api_id           = aws_apigatewayv2_api.http_api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.job_api_handler.invoke_arn
+}
+
+# Route for listing all job roles
+resource "aws_apigatewayv2_route" "get_job_roles_route" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "GET /getJobRoles"
+  target    = "integrations/${aws_apigatewayv2_integration.jobs_lambda_integration.id}"
+}
+
+# Route for getting a single job by its ID
+resource "aws_apigatewayv2_route" "get_job_by_id_route" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "GET /jobs/{jobId}"
+  target    = "integrations/${aws_apigatewayv2_integration.jobs_lambda_integration.id}"
+}
+
+# Permission for API Gateway to invoke the new job description Lambda
+resource "aws_lambda_permission" "allow_api_invoke_jobs_lambda" {
+  statement_id  = "AllowAPIGatewayInvokeJobsLambda"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.job_api_handler.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
 }
