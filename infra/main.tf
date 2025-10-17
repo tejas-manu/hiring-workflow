@@ -352,7 +352,7 @@ resource "aws_dynamodb_table" "job_table" {
   hash_key       = "id"
 
   attribute {
-    name = "id"
+    name = "jobId"
     type = "S"
   }
 }
