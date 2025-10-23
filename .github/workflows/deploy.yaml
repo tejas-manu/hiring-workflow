@@ -198,6 +198,7 @@ jobs:
           npm install
           npm run build
         env:
+          CI: false
           REACT_APP_BACKEND_URL: ${{ needs.provision_infra.outputs.API_GATEWAY_ENDPOINT }}
       - name: Deploy to S3
         run: >
