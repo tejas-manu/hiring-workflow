@@ -422,3 +422,103 @@ input[type="file"] {
   text-decoration: underline;
   color: #b91c1c;
 }
+/* 🌐 Home Page Styling */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+  color: white;
+  text-align: center;
+  padding: 0 20px;
+  animation: fadeIn 1s ease-in-out;
+}
+
+.home-container h1 {
+  font-size: 2.8rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+}
+
+.home-container p {
+  font-size: 1.2rem;
+  max-width: 600px;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+/* 🎯 Call to Action Button */
+.primary-btn {
+  background-color: #ffffff;
+  color: #007bff;
+  border: none;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.primary-btn:hover {
+  background-color: #0056b3;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* ✨ Optional floating animation for visual appeal */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 💫 Optional subtle background animation */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.home-container {
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease infinite;
+}
+
+/* Sidebar link styling */
+.sidebar ul li a {
+  color: #e0e0e0; /* Light gray text */
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+/* On hover */
+.sidebar ul li a:hover {
+  color: #ffffff; /* Bright white on hover */
+}
+
+/* Active job role highlight */
+.sidebar ul li.active a {
+  background-color: #ffffff; /* White highlight for active job */
+  color: #1a237e; /* Deep blue text for contrast */
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: inline-block;
+}

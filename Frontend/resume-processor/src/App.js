@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-// import Login from "./Login";
+import HomePage from "./HomePage";
 import Dashboard from "./Dashboard";
 import "./App.css";
 
@@ -8,9 +8,9 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        {/* Default route goes to HomePage */}
+        <Route path="/" element={<HomePage />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        {/* ✅ New route to show Dashboard for specific job */}
         <Route path="/jobs/:jobId" element={<Dashboard />} />
       </Routes>
     </Router>

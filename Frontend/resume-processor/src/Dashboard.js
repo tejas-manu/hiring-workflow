@@ -16,7 +16,10 @@ function Dashboard() {
   const location = useLocation();
 
   // Normalize base URL and remove trailing slash
-  const backendBase = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+  const backendBase = (process.env.REACT_APP_BACKEND_URL || "").replace(
+    /\/+$/,
+    ""
+  );
 
   // 1) Fetch roles once
   useEffect(() => {
@@ -28,7 +31,10 @@ function Dashboard() {
         const res = await axios.get(`${backendBase}/getJobRoles`);
         const list = Array.isArray(res.data) ? res.data : [];
         // normalize ids to strings
-        const normalized = list.map(j => ({ ...j, id: j?.id != null ? String(j.id) : "" }));
+        const normalized = list.map((j) => ({
+          ...j,
+          id: j?.id != null ? String(j.id) : "",
+        }));
         if (mounted) setJobs(normalized);
       } catch (err) {
         console.error("Error fetching jobs:", err);
@@ -38,7 +44,9 @@ function Dashboard() {
       }
     };
     fetchJobs();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
     // only depends on backendBase, not jobId
   }, [backendBase]);
 
@@ -47,7 +55,7 @@ function Dashboard() {
     if (!jobs.length) return;
 
     if (jobId) {
-      const found = jobs.find(j => String(j.id) === String(jobId));
+      const found = jobs.find((j) => String(j.id) === String(jobId));
       setSelectedJob(found || jobs[0]);
     } else {
       setSelectedJob(jobs[0]);
@@ -76,7 +84,9 @@ function Dashboard() {
       }
 
       setStatus("Uploading PDF to S3...");
-      await axios.put(url, file, { headers: { "Content-Type": "application/pdf" } });
+      await axios.put(url, file, {
+        headers: { "Content-Type": "application/pdf" },
+      });
 
       setStatus("✅ Successfully uploaded to S3!");
       setFile(null);
@@ -98,7 +108,6 @@ function Dashboard() {
       <div className="sidebar">
         <div className="sidebar-header">
           <h3>Job Roles</h3>
-          <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
 
         {loading ? (
@@ -106,11 +115,15 @@ function Dashboard() {
         ) : (
           <ul>
             {jobs.map((job) => {
-              const isActive = selectedJob?.id && String(selectedJob.id) === String(job.id);
+              const isActive =
+                selectedJob?.id && String(selectedJob.id) === String(job.id);
               return (
                 <li key={job.id} className={isActive ? "active" : ""}>
                   {/* URL updates -> useEffect above reselects */}
-                  <Link to={`/jobs/${job.id}`} onClick={() => setSelectedJob(job)}>
+                  <Link
+                    to={`/jobs/${job.id}`}
+                    onClick={() => setSelectedJob(job)}
+                  >
                     {job.title}
                   </Link>
                 </li>
@@ -132,7 +145,9 @@ function Dashboard() {
           </div>
         )}
 
-        <p className="job-desc">Upload your resume to analyze how well it fits this role.</p>
+        <p className="job-desc">
+          Upload your resume to analyze how well it fits this role.
+        </p>
 
         <div className="upload-section">
           <label
@@ -141,14 +156,21 @@ function Dashboard() {
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              if (e.dataTransfer.files.length > 0) setFile(e.dataTransfer.files[0]);
+              if (e.dataTransfer.files.length > 0)
+                setFile(e.dataTransfer.files[0]);
             }}
           >
             <img src="pdf-icon.jpg" alt="upload" className="upload-icon" />
             {file ? (
               <div className="file-preview">
                 <p>📄 {file.name}</p>
-                <button type="button" className="remove-btn" onClick={handleRemoveFile}>✖ Remove</button>
+                <button
+                  type="button"
+                  className="remove-btn"
+                  onClick={handleRemoveFile}
+                >
+                  ✖ Remove
+                </button>
               </div>
             ) : (
               <p>Drag & drop your resume here or click to browse</p>
@@ -162,7 +184,9 @@ function Dashboard() {
             />
           </label>
 
-          <button onClick={handleSubmit} className="upload-btn">Upload & Submit</button>
+          <button onClick={handleSubmit} className="upload-btn">
+            Upload & Submit
+          </button>
         </div>
 
         {status && <p className="status">{status}</p>}
