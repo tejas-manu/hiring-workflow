@@ -122,7 +122,16 @@ resource "aws_iam_policy" "lambda_permissions" {
         Action   = "sns:Publish",
         Effect   = "Allow",
         Resource = aws_sns_topic.notifications.arn
-      }
+      },
+      {
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ],
+        Effect   = "Allow",
+        Resource = aws_dynamodb_table.job_table.arn
+		}
     ]
   })
 }
@@ -301,7 +310,7 @@ resource "aws_iam_role_policy_attachment" "api_lambda_policy_attach" {
 resource "aws_lambda_function" "api_lambda" {
   function_name    = "${var.project_name}-api"
   role             = aws_iam_role.api_lambda_role.arn
-  handler          = "getPresignedUrl-handler.handler" 
+  handler          = "getPresignedUrl.handler" 
   runtime          = "python3.13"
   timeout          = 180
   memory_size      = 256
